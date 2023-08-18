@@ -65,7 +65,7 @@ class ServoCtrl:
         while True:
             if self.ser.in_waiting > 0:
                 msg = self.ser.read(self.ser.in_waiting)
-                print("serial read", msg)
+                # print("serial read", msg)
                 for byte in msg:
                     self.process_byte(byte)
 
@@ -77,7 +77,7 @@ class ServoCtrl:
                     self.frame_header_count = 0
                     self.got_frame_header = True
                     self.data_count = 2
-                    print("got frame header!")
+                    # print("got frame header!")
             else:
                 self.got_frame_header = False
                 self.data_count = 0
@@ -93,7 +93,7 @@ class ServoCtrl:
                     self.got_frame_header = False
             self.data_count += 1
             if self.data_count == self.data_length + 3:
-                print("msg received successfully!")
+                # print("msg received successfully!")
                 self.rx_completed = True
                 self.got_frame_header = False
 
@@ -185,7 +185,7 @@ class ServoCtrl:
         buf[4] = self.SERVO_POS_READ
         buf[5] = checksum(buf)
         self.ser.write(buf)
-        print("read_position cmd has been send")
+        # print("read_position cmd has been send")
         ret = self.read_response()
         print("read_position result: ", ret)
         return ret
