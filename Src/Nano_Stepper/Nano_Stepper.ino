@@ -1,5 +1,5 @@
 #include<SCoop.h>
-
+#define MAX_POSITION 2600
 const int A1_pin=3,A2_pin=4,B1_pin=5,B2_pin=6, LED_pin=13;
 
 /**
@@ -8,7 +8,7 @@ const int A1_pin=3,A2_pin=4,B1_pin=5,B2_pin=6, LED_pin=13;
 defineTaskLoop(info_Task){
   static bool LED_state = 1;
   while(1){
-    Serial.println("hello");
+    //Serial.println("hello");
     // delay(2000); 针对全局
     sleep(2000); // 针对线程
     if(LED_state) {
@@ -109,42 +109,56 @@ void set_step(int ID)
     return;
 }
 
+
 uint16_t position=0, target_pos=0;
+static int freq=10;
 const short next[5] = {0,4,3,1,2},
           last[5] = {0,3,4,2,1};
 void set_speed(int delay_ms, bool dir)
 {
   static int tem_step=1;
-  
-  //update position
 
   if(dir) {
     tem_step=next[tem_step];
     set_step(tem_step);
+    if(position==MAX_POSITION) position=0;
+    else position++;
   }
-
   else {
     tem_step=last[tem_step];
     set_step(tem_step);
+    if(position==0) position=MAX_POSITION;
+    else position--;
   }
+
   delay(delay_ms);
-  
   return;
 }
 
 void set_position(uint16_t tar_pos)
 {
-  //position guide the speed
-
+  int dis = tar_pos-position;
+  if(dis==0) return;
+  if(dis > 0){
+    if(dis < MAX_POSITION/2) {
+      set_speed(freq,1);
+    }
+    else set_speed(freq,0);
+  }
+  else {
+    if(-dis < MAX_POSITION/2) {
+      set_speed(freq,0);
+    }
+    else set_speed(freq,1);
+  }
   return;
 }
 
-static int freq=10;
-static bool dir=1, ctrl_mode=1;//0:position 1:speed
+static bool dir=1, ctrl_mode=0;//0:position 1:speed
 void loop() {
   if(ctrl_mode) set_speed(freq,dir);
   else set_position(target_pos);
-  yield();
+  //yield();
 }
 
 /**
@@ -158,6 +172,8 @@ void loop() {
  *    byte 1~2：坐标
  *  0x03读取速度
  *  0x04读取位置
+ *  0x05 stop
+ *  0x06 position reset
 */  
 void buf_process(uint8_t *buf)
 {
@@ -166,6 +182,7 @@ void buf_process(uint8_t *buf)
     case 0x01:
       dir=buf[1];
       freq=buf[2]<<8|buf[3];
+      ctrl_mode=1;
       Serial.print("set speed: ");
       Serial.print(dir);
       Serial.print(" ");
@@ -173,6 +190,7 @@ void buf_process(uint8_t *buf)
       break;
     case 0x02:
       target_pos=buf[1]<<8|buf[2];
+      ctrl_mode=0;
       Serial.print("set target position: ");
       Serial.println(target_pos);
       break;
@@ -185,6 +203,16 @@ void buf_process(uint8_t *buf)
     case 0x04:
       Serial.println("read position: ");
       Serial.println(position); 
+      break;
+    case 0x05:
+      Serial.println("stop");
+      ctrl_mode=0;
+      target_pos=position;
+      break;
+    case 0x06:
+      Serial.println("position reset");
+      target_pos=0;
+      position=0;
       break;
     default:
       Serial.println("error cmd type");
@@ -220,7 +248,7 @@ void serialEvent(){
       {
         end_flag=0;
         buf_index=0;
-        Serial.println("received data");
+        //Serial.println("received data");
         buf_process(buf);
       }
       else {
