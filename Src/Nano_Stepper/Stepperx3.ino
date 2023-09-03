@@ -9,20 +9,21 @@ const int motor_A1[3] = {2,6,10},
 class Motor{
   private:
     int A1_pin, A2_pin, B1_pin, B2_pin;
-    bool dir=0, ctrl_mode=0;                          //0:position 1:speed
+    bool dir=0, ctrl_mode=1;                          //0:position 1:speed
     int tem_step = 1;
     uint16_t position=0, target_pos=0;
     int freq=10;
     const short next[5] = {0,4,3,1,2},
                 last[5] = {0,3,4,2,1};
   public:
-    Motor::Motor(int A1_pin, int A2_pin, int B1_pin, int B2_pin){
+    Motor() {}
+    Motor(int A1_pin, int A2_pin, int B1_pin, int B2_pin){
       this->A1_pin = A1_pin;
       this->A2_pin = A2_pin;
       this->B1_pin = B1_pin;
       this->B2_pin = B2_pin;
     }
-
+    void motor_run(void);
     void set_step(int ID);
     void set_speed(void);
     void set_position(void);
@@ -99,6 +100,10 @@ void Motor::set_step(int ID)
   return;
 }
 
+void Motor::motor_run(void){
+  if (ctrl_mode) set_speed();
+  else set_position();
+}
 void Motor::set_speed(void) {
   if(dir) {
     tem_step=next[tem_step];
@@ -169,6 +174,11 @@ uint16_t Motor::get_position(void)
   return position;
 }
 
+Motor M[3] = {
+  Motor(motor_A1[0],motor_A2[0],motor_B1[0],motor_B2[0]),
+  Motor(motor_A1[1],motor_A2[1],motor_B1[1],motor_B2[1]),
+  Motor(motor_A1[2],motor_A2[2],motor_B1[2],motor_B2[2])
+};
 void setup() {
   for(int i=0;i<3;i++){
     pinMode(motor_A1[i],OUTPUT);
@@ -176,15 +186,11 @@ void setup() {
     pinMode(motor_B1[i],OUTPUT);
     pinMode(motor_B2[i],OUTPUT);
   }
-  Motor M[] ={Motor(motor_A1[0],motor_A2[0],motor_B1[0],motor_B2[0]), 
-              Motor(motor_A1[1],motor_A2[1],motor_B1[1],motor_B2[1]), 
-              Motor(motor_A1[2],motor_A2[2],motor_B1[2],motor_B2[2])};
-
+//
   Serial.begin(115200);
   while(Serial.read()>=0){}                   //clear buffer
   mySCoop.start();
 }
-
 
 /**
  * 信息打印线程
@@ -206,21 +212,17 @@ defineTaskLoop(info_Task){
   }
 }
 
-
 /**
  * 电机控制线程
 */
 defineTaskLoop(motor1_Task) {
-  if (M[0].ctrl_mode) M1.set_speed();
-  else M[0].set_position();
+  M[0].motor_run();
 }
 defineTaskLoop(motor2_Task) {
-  if (M[1].ctrl_mode) M2.set_speed();
-  else M[1].set_position();
+  M[1].motor_run();
 }
 defineTaskLoop(motor3_Task) {
-  if (M[2].ctrl_mode) M3.set_speed();
-  else M[2].set_position();
+  M[2].motor_run();
 }
 
 //static bool dir=1, ctrl_mode=0;//0:position 1:speed
@@ -249,11 +251,12 @@ void buf_process(uint8_t *buf)
 {
   uint8_t ID = buf[0];
   uint8_t type = buf[1];
+  bool dir=buf[2];
+  int freq = buf[3]<<8|buf[4];
+  uint16_t target_pos=buf[2]<<8|buf[3];
   Serial.print(ID);
   switch(type) {
     case 0x01:
-      dir=buf[2];
-      freq=buf[3]<<8|buf[4];
       M[ID].set_ctrl_mode(1,dir,freq);
       Serial.print(" set speed: ");
       Serial.print(dir);
@@ -261,7 +264,6 @@ void buf_process(uint8_t *buf)
       Serial.println(freq);
       break;
     case 0x02:
-      target_pos=buf[2]<<8|buf[3];
       M[ID].set_ctrl_mode(0,target_pos);
       Serial.print(" set target position: ");
       Serial.println(target_pos);
@@ -284,9 +286,10 @@ void buf_process(uint8_t *buf)
       break;
     default:
       Serial.println(" error cmd type");
+      Serial.println(type);
       break;
   }
-  retrun;
+  return;
 }
 
 /*
@@ -317,7 +320,11 @@ void serialEvent(){
       {
         end_flag=0;
         buf_index=0;
-        //Serial.println("received data");
+        for (int i = 0; i < 10; i++) {
+          Serial.print(buf[i]);
+        }
+Serial.println();
+
         buf_process(buf);
       }
       else {
