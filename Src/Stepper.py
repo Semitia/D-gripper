@@ -7,6 +7,7 @@ GitHub: github.com/semitia
 date: 2023-09-04
 version: 0.0.1
 """
+import time
 import serial
 
 
@@ -19,20 +20,32 @@ def add_tail(cmd):
 class StepperCtrl:
     STEP_DISTANCE = 0.001                                           # 单步距离/m
 
-    def __init__(self, port, baud, num):
+    def __init__(self, num):
         self.num = num                                              # 电机编号
         self.speed = 0                                              # 电机速度
-        self.ser = serial.Serial(port, baud)
+        self.speed_updated = False                                  # 电机速度是否更新
+        # self.ser = serial.Serial(port, baud)
         print("Init StepperCtrl Complete!")
 
-    def set_speed(self, direction, speed):
+    def set_speed(self, speed):
         # 生成0x01类型的指令
-        freq = int(speed / self.STEP_DISTANCE)                                # 将speed转换为频率
+        if speed == 0:
+            freq = 0xffff
+        else:
+            if speed > 0:
+                direction = 0x00
+
+            else:
+                direction = 0x01
+                speed = -speed
+            freq = int(speed / self.STEP_DISTANCE)            # 将speed转换为频率
+
         cmd = bytearray([self.num, 0x01, direction, freq >> 8, freq & 0xFF])
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
-        self.ser.write(cmd)
+        # self.ser.write(cmd)
+        return cmd
 
     def set_position(self, target_position):
         # 生成0x02类型的指令
@@ -40,15 +53,30 @@ class StepperCtrl:
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
-        self.ser.write(cmd)
+        # self.ser.write(cmd)
+        return cmd
 
     def read_speed(self):
         # 生成0x03类型的指令
         cmd = bytearray([self.num, 0x03])
         # 添加帧尾
         cmd = add_tail(cmd)
-        # 发送指令
-        self.ser.write(cmd)
+        # # 发送指令
+        # self.ser.write(cmd)
+        # count = 50
+        # while not self.speed_updated:
+        #     count -= 1
+        #     time.sleep(0.001)
+        #     if count <= 0:
+        #         print("read speed timeout")
+        #         return
+        # self.speed_updated = False
+        # print("no.", self.num, "speed:", self.speed)
+        # return self.speed
+
+    def speed_update(self, speed):
+        self.speed = speed
+        self.speed_updated = True
 
     def read_position(self):
         # 生成0x04类型的指令
@@ -56,7 +84,8 @@ class StepperCtrl:
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
-        self.ser.write(cmd)
+        # self.ser.write(cmd)
+        return cmd
 
     def stop(self):
         # 生成0x05类型的指令
@@ -64,7 +93,8 @@ class StepperCtrl:
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
-        self.ser.write(cmd)
+        # self.ser.write(cmd)
+        return cmd
 
     def position_reset(self):
         # 生成0x06类型的指令
@@ -72,5 +102,5 @@ class StepperCtrl:
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
-        self.ser.write(cmd)
-
+        # self.ser.write(cmd)
+        return cmd

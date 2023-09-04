@@ -10,7 +10,7 @@ const int ADC_pin[3] = {A0,A1,A2};
 class Motor{
   private:
     int A1_pin, A2_pin, B1_pin, B2_pin;
-    bool dir=0, ctrl_mode=1;                          //0:position 1:speed
+    bool dir=0, ctrl_mode=0;                          //0:position 1:speed
     int tem_step = 1;
     uint16_t position=0, target_pos=0;
     int freq=10;
@@ -277,6 +277,7 @@ void buf_process(uint8_t *buf)
 {
   uint8_t ID = buf[0];
   uint8_t type = buf[1];
+  uint8_t resp_buf;
   bool dir=buf[2];
   int freq = buf[3]<<8|buf[4];
   uint16_t target_pos=buf[2]<<8|buf[3];
@@ -294,9 +295,23 @@ void buf_process(uint8_t *buf)
       Serial.print(" set target position: ");
       Serial.println(target_pos);
       break;
-    case 0x03:
+    case 0x03: {
       Serial.println(" read speed: ");
-      Serial.print(M[ID].get_speed());
+      Serial.println(M[ID].get_speed());
+      int speed = M[ID].get_speed();
+      resp_buf = 3;
+      Serial.print(resp_buf,HEX);
+      if(speed>0) Serial.print(1,HEX);
+      else {
+        Serial.print(0,HEX);
+        speed = -speed;
+      }
+      resp_buf = (speed&0xff00)>>8;
+      Serial.print(resp_buf,HEX);
+      resp_buf = speed&0xff;
+      Serial.print(resp_buf,HEX);
+      Serial.print("AI");
+    }
       break;
     case 0x04:
       Serial.println(" read position: ");
@@ -350,10 +365,10 @@ void serialEvent(){
       {
         end_flag=0;
         buf_index=0;
-        for (int i = 0; i < 10; i++) {
-          Serial.print(buf[i]);
-        }
-Serial.println();
+        //for (int i = 0; i < 10; i++) {
+        //  Serial.print(buf[i]);
+        //}
+        //Serial.println();
 
         buf_process(buf);
       }

@@ -7,7 +7,7 @@ GitHub: github.com/semitia
 date: 2023-09-04
 version: 0.0.1
 """
-import Stepper
+from Stepper import StepperCtrl
 import serial
 import threading
 
@@ -21,7 +21,11 @@ def add_tail(cmd):
 class NanoCtrl:
     def __init__(self, port, baud):
         self.ser = serial.Serial(port, baud)
-        self.motor[3] = [Stepper(port, baud, i) for i in range(3)]      # 3个电机
+        self.motor = [None] * 3  # 初始化self.motor
+        self.motor = [StepperCtrl(i) for i in range(3)]      # 3个电机
+        self.rxbuf = bytearray()
+        self.end_flag = 0
+        # self.rxbuf_len = 0
         self.ReadPortThread = threading.Thread(target=self.read_port)
         self.ReadPortThread.start()
         print("Init StepperCtrl Complete!")
@@ -30,86 +34,82 @@ class NanoCtrl:
         while True:
             if self.ser.in_waiting > 0:
                 msg = self.ser.read(self.ser.in_waiting)
-                # print("serial read", msg.decode())
+                print(msg)
                 for byte in msg:
                     self.process_byte(byte)
 
     def process_byte(self, byte):
-        # 读取到的byte是int类型
+        self.rxbuf.append(byte)
+        # 结束标识符 0x41 0x49
+        if self.end_flag == 0:
+            if byte == 0x41:
+                self.end_flag = 1
+        elif self.end_flag == 1:
+            if byte == 0x49:
+                self.end_flag = 0
+                print("received ", self.rxbuf)
+                self.process_frame()
+            else:
+                self.end_flag = 0
+                self.rxbuf.clear()
+                print("Error: end_flag = 1, byte != 0x49")
         return
 
-    def set_speed(self, direction, freq):
-        # 生成0x01类型的指令
-        cmd = bytearray([0x01, direction, freq >> 8, freq & 0xFF])
-        # 添加帧尾
-        cmd = add_tail(cmd)
-        # 发送指令
-        self.ser.write(cmd)
-
-    def set_position(self, target_pos):
-        # 生成0x02类型的指令
-        cmd = bytearray([0x02, target_pos >> 8, target_pos & 0xFF])
-        # 添加帧尾
-        cmd = add_tail(cmd)
-        # 发送指令
-        self.ser.write(cmd)
-
-    def read_speed(self):
-        # 生成0x03类型的指令
-        cmd = bytearray([0x03])
-        # 添加帧尾
-        cmd = add_tail(cmd)
-        # 发送指令
-        self.ser.write(cmd)
-
-    def read_position(self):
-        # 生成0x04类型的指令
-        cmd = bytearray([0x04])
-        # 添加帧尾
-        cmd = add_tail(cmd)
-        # 发送指令
-        self.ser.write(cmd)
-
-    def stop(self):
-        # 生成0x05类型的指令
-        cmd = bytearray([0x05])
-        # 添加帧尾
-        cmd = add_tail(cmd)
-        # 发送指令
-        self.ser.write(cmd)
-
-    def position_reset(self):
-        # 生成0x06类型的指令
-        cmd = bytearray([0x06])
-        # 添加帧尾
-        cmd = add_tail(cmd)
-        # 发送指令
-        self.ser.write(cmd)
+    def process_frame(self):
+        id_num = self.rxbuf[0]
+        if self.rxbuf[1] == 0x03:
+            # 读取速度
+            speed = self.rxbuf[3] << 8 | self.rxbuf[4]
+            if self.rxbuf[2]:
+                speed = -speed
+            self.motor[id_num].speed_update(speed)
+            print("motor", id_num, "speed", speed)
 
 
-controller = NanoCtrl('COM4', 115200)
+controller = NanoCtrl('COM7', 115200)
 while True:
     command = input('Enter a command: \n '
-                    '1. read position \n '
-                    '2. set position <target_position> \n'
-                    '3. set speed <direction> <freq> \n'
-                    '4. read speed \n'
-                    '5. stop \n'
-                    '6. position reset \n')
+                    '1. read position <ID> \n '
+                    '2. set position <ID> <target_position> \n'
+                    '3. set speed <ID> <speed> \n'
+                    '4. read speed <ID> \n'
+                    '5. stop <ID>\n'
+                    '6. position reset <ID>\n')
+    # if 'read position' in command or '<1>' in command:
+    #     controller.read_position()
+    # elif 'set position' in command or '<2>' in command:
+    #     target_pos = int(command.split(' ')[-1])
+    #     controller.set_position(target_pos)
+    # elif 'set speed' in command or '<3>' in command:
+    #     direction = int(command.split(' ')[-2])
+    #     freq = int(command.split(' ')[-1])
+    #     controller.set_speed(direction, freq)
+    # elif 'read speed' in command or '<4>' in command:
+    #     controller.read_speed()
+    # elif 'stop' in command or '<5>' in command:
+    #     controller.stop()
+    # elif 'position reset' in command or '<6>' in command:
+    #     controller.position_reset()
+    # else:
+    #     print('Unknown command')
     if 'read position' in command or '<1>' in command:
-        controller.read_position()
+        id_number = int(command.split(' ')[-1])
+        controller.motor[id_number].read_position()
+        print("read position")
     elif 'set position' in command or '<2>' in command:
+        id_number = int(command.split(' ')[-2])
         target_pos = int(command.split(' ')[-1])
-        controller.set_position(target_pos)
+        controller.motor[id_number].set_position(target_pos)
+        print("set position", target_pos)
     elif 'set speed' in command or '<3>' in command:
-        direction = int(command.split(' ')[-2])
-        freq = int(command.split(' ')[-1])
-        controller.set_speed(direction, freq)
+        id_number = int(command.split(' ')[-2])
+        tar_speed = float(command.split(' ')[-1])
+        controller.ser.write(controller.motor[id_number].set_speed(tar_speed))
+        print("set speed", tar_speed)
     elif 'read speed' in command or '<4>' in command:
-        controller.read_speed()
-    elif 'stop' in command or '<5>' in command:
-        controller.stop()
-    elif 'position reset' in command or '<6>' in command:
-        controller.position_reset()
+        id_number = int(command.split(' ')[-1])
+        controller.motor[id_number].read_speed()
+        print("read speed")
     else:
         print('Unknown command')
+
