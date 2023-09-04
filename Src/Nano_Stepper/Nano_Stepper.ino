@@ -1,6 +1,10 @@
 #include<SCoop.h>
 #define MAX_POSITION 2600
-const int A1_pin=3,A2_pin=4,B1_pin=5,B2_pin=6, LED_pin=13;
+const int LED_pin=13;
+const int motor_A1[3] = {2,6,10},
+          motor_A2[3] = {3,7,11},
+          motor_B1[3] = {4,8,12},
+          motor_B2[3] = {5,9,13};
 
 /**
  * 信息打印线程
@@ -23,11 +27,12 @@ defineTaskLoop(info_Task){
 }
 
 void setup() {
-  pinMode(A1_pin,OUTPUT);
-  pinMode(A2_pin,OUTPUT);
-  pinMode(B1_pin,OUTPUT);
-  pinMode(B2_pin,OUTPUT);
-  pinMode(LED_pin,OUTPUT);
+  for(int i=0;i<3;i++){
+    pinMode(motor_A1[i],OUTPUT);
+    pinMode(motor_A2[i],OUTPUT);
+    pinMode(motor_B1[i],OUTPUT);
+    pinMode(motor_B2[i],OUTPUT);
+  }
   Serial.begin(115200);
   while(Serial.read()>=0){}//clear buffer
   mySCoop.start();
@@ -36,76 +41,72 @@ void setup() {
 /**
  * 单步控制函数
 */
-void set_step(int ID)
+void set_step(int ID, int motor_ID)
 {
   switch(ID){
     case 1:
       //Serial.println("mode 1");
-      digitalWrite(A1_pin,HIGH);
-      digitalWrite(A2_pin,LOW);
-      digitalWrite(B1_pin,LOW);
-      digitalWrite(B2_pin,LOW);
+      digitalWrite(motor_A1[motor_ID],HIGH);
+      digitalWrite(motor_A2[motor_ID],LOW);
+      digitalWrite(motor_B1[motor_ID],LOW);
+      digitalWrite(motor_B2[motor_ID],LOW);
       break;
     case 2:
       //Serial.println("mode 2");
-      digitalWrite(A1_pin,LOW);
-      digitalWrite(A2_pin,HIGH);
-      digitalWrite(B1_pin,LOW);
-      digitalWrite(B2_pin,LOW);
+      digitalWrite(motor_A1[motor_ID],LOW);
+      digitalWrite(motor_A2[motor_ID],HIGH);
+      digitalWrite(motor_B1[motor_ID],LOW);
+      digitalWrite(motor_B2[motor_ID],LOW);
       break;
-    case 3:
+    case 3: 
       //Serial.println("mode 3");
-      digitalWrite(A1_pin,LOW);
-      digitalWrite(A2_pin,LOW);
-      digitalWrite(B1_pin,HIGH);
-      digitalWrite(B2_pin,LOW);
+      digitalWrite(motor_A1[motor_ID],LOW);
+      digitalWrite(motor_A2[motor_ID],LOW);
+      digitalWrite(motor_B1[motor_ID],HIGH);
+      digitalWrite(motor_B2[motor_ID],LOW);
       break;
     case 4:
       //Serial.println("mode 4");
-      digitalWrite(A1_pin,LOW);
-      digitalWrite(A2_pin,LOW);
-      digitalWrite(B1_pin,LOW);
-      digitalWrite(B2_pin,HIGH);
+      digitalWrite(motor_A1[motor_ID],LOW);
+      digitalWrite(motor_A2[motor_ID],LOW);
+      digitalWrite(motor_B1[motor_ID],LOW);
+      digitalWrite(motor_B2[motor_ID],HIGH);
       break;
     case 0:
       //Serial.println("stop");
-      digitalWrite(A1_pin,LOW);
-      digitalWrite(A2_pin,LOW);
-      digitalWrite(B1_pin,LOW);
-      digitalWrite(B2_pin,LOW);
+      digitalWrite(motor_A1[motor_ID],LOW);
+      digitalWrite(motor_A2[motor_ID],LOW);
+      digitalWrite(motor_B1[motor_ID],LOW);
+      digitalWrite(motor_B2[motor_ID],LOW);
       break;
     case 5:
       //Serial.println("mode5");
-      digitalWrite(A1_pin,HIGH);
-      digitalWrite(A2_pin,LOW);
-      digitalWrite(B1_pin,HIGH);
-      digitalWrite(B2_pin,LOW);
+      digitalWrite(motor_A1[motor_ID],HIGH);
+      digitalWrite(motor_A2[motor_ID],LOW);
+      digitalWrite(motor_B1[motor_ID],HIGH);
+      digitalWrite(motor_B2[motor_ID],LOW);
       break;
     case 6:
       //Serial.println("mode6");
-      digitalWrite(A1_pin,HIGH);
-      digitalWrite(A2_pin,LOW);
-      digitalWrite(B1_pin,LOW);
-      digitalWrite(B2_pin,HIGH);
+      digitalWrite(motor_A1[motor_ID],HIGH);
+      digitalWrite(motor_A2[motor_ID],LOW);
+      digitalWrite(motor_B1[motor_ID],LOW);
+      digitalWrite(motor_B2[motor_ID],HIGH);
       break;
     case 7:
       //Serial.println("mode7");
-      digitalWrite(A1_pin,LOW);
-      digitalWrite(A2_pin,HIGH);
-      digitalWrite(B1_pin,LOW);
-      digitalWrite(B2_pin,HIGH);
+      digitalWrite(motor_A1[motor_ID],LOW);
+      digitalWrite(motor_A2[motor_ID],HIGH);
+      digitalWrite(motor_B1[motor_ID],LOW);
+      digitalWrite(motor_B2[motor_ID],HIGH);
       break;
     case 8:
       //Serial.println("mode8");
-      digitalWrite(A1_pin,LOW);
-      digitalWrite(A2_pin,HIGH);
-      digitalWrite(B1_pin,HIGH);
-      digitalWrite(B2_pin,LOW);
-      break;                        
-    default:
-      Serial.println("Invalid input");
+      digitalWrite(motor_A1[motor_ID],LOW);
+      digitalWrite(motor_A2[motor_ID],HIGH);
+      digitalWrite(motor_B1[motor_ID],HIGH);
+      digitalWrite(motor_B2[motor_ID],LOW);
       break;
-    }
     return;
 }
 
@@ -113,8 +114,8 @@ void set_step(int ID)
 uint16_t position=0, target_pos=0;
 static int freq=10;
 const short next[5] = {0,4,3,1,2},
-          last[5] = {0,3,4,2,1};
-void set_speed(int delay_ms, bool dir)
+            last[5] = {0,3,4,2,1};
+void set_speed(int delay_ms, bool dir, int motor_ID)
 {
   static int tem_step=1;
 

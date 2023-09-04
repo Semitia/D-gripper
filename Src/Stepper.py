@@ -1,6 +1,13 @@
-import time
+"""
+This a library to control a stepper motor when more than one motor is used.
+As a result, the controller need a serial port, but don't need to init and read it.
+
+author: Leonaruic
+GitHub: github.com/semitia
+date: 2023-09-04
+version: 0.0.1
+"""
 import serial
-import threading
 
 
 def add_tail(cmd):
@@ -10,31 +17,26 @@ def add_tail(cmd):
 
 
 class StepperCtrl:
-    def __init__(self, port, baud):
+    STEP_DISTANCE = 0.001                                           # 单步距离/m
+
+    def __init__(self, port, baud, num):
+        self.num = num                                              # 电机编号
+        self.speed = 0                                              # 电机速度
         self.ser = serial.Serial(port, baud)
-        self.ReadPortThread = threading.Thread(target=self.read_port)
-        self.ReadPortThread.start()
         print("Init StepperCtrl Complete!")
 
-    def read_port(self):
-        while True:
-            if self.ser.in_waiting > 0:
-                msg = self.ser.read(self.ser.in_waiting)
-                print("serial read", msg.decode())
-                # for byte in msg:
-                #     self.process_byte(byte)
-
-    def set_speed(self, direction, freq):
+    def set_speed(self, direction, speed):
         # 生成0x01类型的指令
-        cmd = bytearray([0x01, direction, freq >> 8, freq & 0xFF])
+        freq = int(speed / self.STEP_DISTANCE)                                # 将speed转换为频率
+        cmd = bytearray([self.num, 0x01, direction, freq >> 8, freq & 0xFF])
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
         self.ser.write(cmd)
 
-    def set_position(self, target_pos):
+    def set_position(self, target_position):
         # 生成0x02类型的指令
-        cmd = bytearray([0x02, target_pos >> 8, target_pos & 0xFF])
+        cmd = bytearray([self.num, 0x02, target_position >> 8, target_position & 0xFF])
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
@@ -42,7 +44,7 @@ class StepperCtrl:
 
     def read_speed(self):
         # 生成0x03类型的指令
-        cmd = bytearray([0x03])
+        cmd = bytearray([self.num, 0x03])
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
@@ -50,7 +52,7 @@ class StepperCtrl:
 
     def read_position(self):
         # 生成0x04类型的指令
-        cmd = bytearray([0x04])
+        cmd = bytearray([self.num, 0x04])
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
@@ -58,7 +60,7 @@ class StepperCtrl:
 
     def stop(self):
         # 生成0x05类型的指令
-        cmd = bytearray([0x05])
+        cmd = bytearray([self.num, 0x05])
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
@@ -66,36 +68,9 @@ class StepperCtrl:
 
     def position_reset(self):
         # 生成0x06类型的指令
-        cmd = bytearray([0x06])
+        cmd = bytearray([self.num, 0x06])
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
         self.ser.write(cmd)
 
-
-controller = StepperCtrl('COM4', 115200)
-while True:
-    command = input('Enter a command: \n '
-                    '1. read position \n '
-                    '2. set position <target_position> \n'
-                    '3. set speed <direction> <freq> \n'
-                    '4. read speed \n'
-                    '5. stop \n'
-                    '6. position reset \n')
-    if 'read position' in command or '<1>' in command:
-        controller.read_position()
-    elif 'set position' in command or '<2>' in command:
-        target_pos = int(command.split(' ')[-1])
-        controller.set_position(target_pos)
-    elif 'set speed' in command or '<3>' in command:
-        direction = int(command.split(' ')[-2])
-        freq = int(command.split(' ')[-1])
-        controller.set_speed(direction, freq)
-    elif 'read speed' in command or '<4>' in command:
-        controller.read_speed()
-    elif 'stop' in command or '<5>' in command:
-        controller.stop()
-    elif 'position reset' in command or '<6>' in command:
-        controller.position_reset()
-    else:
-        print('Unknown command')

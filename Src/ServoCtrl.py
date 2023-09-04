@@ -191,7 +191,7 @@ class ServoCtrl:
         return ret
 
 
-controller = ServoCtrl('COM4', 115200)
+controller = ServoCtrl('COM7', 115200)
 controller.read_position(1)
 while True:
     command = input('Enter a command: \n '
