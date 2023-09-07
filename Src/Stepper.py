@@ -56,23 +56,23 @@ class StepperCtrl:
         # self.ser.write(cmd)
         return cmd
 
-    def read_speed(self):
+    def read_speed(self, ser):
         # 生成0x03类型的指令
         cmd = bytearray([self.num, 0x03])
         # 添加帧尾
         cmd = add_tail(cmd)
-        # # 发送指令
-        # self.ser.write(cmd)
-        # count = 50
-        # while not self.speed_updated:
-        #     count -= 1
-        #     time.sleep(0.001)
-        #     if count <= 0:
-        #         print("read speed timeout")
-        #         return
-        # self.speed_updated = False
-        # print("no.", self.num, "speed:", self.speed)
-        # return self.speed
+        # 发送指令
+        ser.write(cmd)
+        count = 50
+        while not self.speed_updated:
+            count -= 1
+            time.sleep(0.001)
+            if count <= 0:
+                print("read speed timeout")
+                return
+        self.speed_updated = False
+        print("no.", self.num, "speed:", self.speed)
+        return self.speed
 
     def speed_update(self, speed):
         self.speed = speed

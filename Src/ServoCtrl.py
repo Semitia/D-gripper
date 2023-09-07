@@ -18,6 +18,12 @@ def checksum(buf):
     return ~temp & 0xff
 
 
+class Servo:
+    def __init__(self):
+        self.temp = 25
+        self.pos = 0
+        self.vin = 0
+
 class ServoCtrl:
     SERVO_FRAME_HEADER = 0x55
     SERVO_MOVE_TIME_WRITE = 1
@@ -190,23 +196,25 @@ class ServoCtrl:
         print("read_position result: ", ret)
         return ret
 
+    # def update(self):
 
-controller = ServoCtrl('COM7', 115200)
-controller.read_position(1)
-while True:
-    command = input('Enter a command: \n '
-                    '1. read position <servo_id>\n '
-                    '2. set position <target_position> <target_time> <servo_id>\n')
-    if 'read position' in command or '<1>' in command:
-        # 提取舵机号码
-        target_id = int(command.split()[-1])
-        controller.read_position(target_id)
-        print(f'Reading position of servo {target_id}')
 
-    elif 'set position' in command or '<2>' in command:
-        # 提取目标角度和舵机号码
-        target_position, target_time, target_id = map(int, command.split()[-3:])
-        controller.move(target_id, target_position, target_time)
-        print(f'Setting position of servo {target_id} to {target_position}')
-    else:
-        print('Unknown command')
+# controller = ServoCtrl('COM7', 115200)
+# controller.read_position(1)
+# while True:
+#     command = input('Enter a command: \n '
+#                     '1. read position <servo_id>\n '
+#                     '2. set position <target_position> <target_time> <servo_id>\n')
+#     if 'read position' in command or '<1>' in command:
+#         # 提取舵机号码
+#         target_id = int(command.split()[-1])
+#         controller.read_position(target_id)
+#         print(f'Reading position of servo {target_id}')
+#
+#     elif 'set position' in command or '<2>' in command:
+#         # 提取目标角度和舵机号码
+#         target_position, target_time, target_id = map(int, command.split()[-3:])
+#         controller.move(target_id, target_position, target_time)
+#         print(f'Setting position of servo {target_id} to {target_position}')
+#     else:
+#         print('Unknown command')
