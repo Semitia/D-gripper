@@ -1,4 +1,4 @@
-#include<SCoop.h>
+#include"SCoop.h"
 #define MAX_POSITION 2600
 const int LED_pin=13;
 const int motor_A1[3] = {2,6,10},
@@ -31,9 +31,15 @@ class Motor{
     void reset_position(void);
     void set_ctrl_mode(bool mode, uint16_t tar_pos=0);
     void set_ctrl_mode(bool mode, bool dir, int delay_ms=10);
+    bool get_ctrl_mode(void);
     uint16_t get_position(void);
     int get_speed(void);
 };
+
+bool Motor::get_ctrl_mode(void)
+{
+  return ctrl_mode;
+}
 
 /**
  * 单步控制函数
@@ -101,10 +107,17 @@ void Motor::set_step(int ID)
   return;
 }
 
+/**
+ * 电机运行函数
+*/
 void Motor::motor_run(void){
   if (ctrl_mode) set_speed();
   else set_position();
 }
+
+/**
+ * 根据freq和dir控制步进
+*/
 void Motor::set_speed(void) {
   if(dir) {
     tem_step=next[tem_step];
@@ -149,6 +162,9 @@ void Motor::reset_position(void)
   return;
 }
 
+/**
+ * 设置为速度控制模式或者位置控制模式
+*/
 void Motor::set_ctrl_mode(bool mode, uint16_t tar_pos)
 {
   ctrl_mode=mode;
@@ -164,6 +180,9 @@ void Motor::set_ctrl_mode(bool mode, bool dir, int delay_ms)
   return;
 }
 
+/**
+ * 获取当前速度, 实际上是步进的时间间隔(ms)
+*/
 int Motor::get_speed(void)
 {
   if(dir) return freq;
@@ -250,6 +269,16 @@ defineTaskLoop(motor3_Task) {
   M[2].motor_run();
 }
 
+/**
+ * 角度读取线程（似乎用不到）
+ */
+// defineTaskLoop(angle_task) {
+//   for(int i=0; i<3; i++) {
+//     AS[i].get_angle();
+//   }
+//   sleep(200);
+// }
+
 //static bool dir=1, ctrl_mode=0;//0:position 1:speed
 void loop() {
   // if(ctrl_mode) set_speed(freq,dir);
@@ -262,78 +291,98 @@ void loop() {
  * @param buf 串口数据
  * byte 0: 电机编号/传感器编号
  * byte 1：类型标识
- *  0x01设置速度
+ *  0x01设置速度(rx)
  *    byte 2：方向
  *    byte 3~4：速度大小，现在其实是步进时间间隔
- *  0x02设置位置
+ *  0x02设置位置(rx)
  *    byte 2~3：坐标
- *  0x03读取速度
- *  0x04读取位置
+ *  0x03读取速度(tx)
+ *    byte 2~3：速度大小，用short来存储
+ *  0x04读取位置(tx)
  *  0x05 stop
  *  0x06 position reset
- *  0x07 read angle
+ *  0x07 read angle(tx)
+ *    byte 2~3：角度大小，用short来存储
 */  
 void buf_process(uint8_t *buf)
 {
   uint8_t ID = buf[0];
   uint8_t type = buf[1];
-  uint8_t resp_buf;
-  bool dir=buf[2];
-  int freq = buf[3]<<8|buf[4];
-  uint16_t target_pos=buf[2]<<8|buf[3];
-  Serial.print(ID);
+  uint8_t tx_buf[20], buf_head=0;
+  //Serial.write(ID);
+  tx_buf[buf_head++] = ID;
+
+  uint16_t target_pos, pos;
+  bool dir;
+  short freq, speed, ang;
   switch(type) {
     case 0x01:
+      dir=buf[2];
+      freq = buf[3]<<8|buf[4];
       M[ID].set_ctrl_mode(1,dir,freq);
-      Serial.print(" set speed: ");
-      Serial.print(dir);
-      Serial.print(" ");
-      Serial.println(freq);
+      // Serial.print(" set speed: ");
+      // Serial.print(dir);
+      // Serial.print(" ");
+      // Serial.println(freq);
       break;
     case 0x02:
+      target_pos=buf[2]<<8|buf[3];
       M[ID].set_ctrl_mode(0,target_pos);
-      Serial.print(" set target position: ");
-      Serial.println(target_pos);
+      // Serial.print(" set target position: ");
+      // Serial.println(target_pos);
       break;
-    case 0x03: {
-      Serial.println(" read speed: ");
-      Serial.println(M[ID].get_speed());
-      int speed = M[ID].get_speed();
-      resp_buf = 3;
-      Serial.print(resp_buf,HEX);
-      if(speed>0) Serial.print(1,HEX);
-      else {
-        Serial.print(0,HEX);
-        speed = -speed;
+    case 0x03: 
+      // Serial.println(" read speed: ");                //测试用
+      // Serial.println(M[ID].get_speed());
+
+      speed = M[ID].get_speed();                         //发送数据
+      tx_buf[buf_head++] = 0x03;
+      if(M[ID].get_ctrl_mode()) {
+        tx_buf[buf_head++] = (speed&0xff00)>>8;
+        tx_buf[buf_head++] = speed&0xff;
       }
-      resp_buf = (speed&0xff00)>>8;
-      Serial.print(resp_buf,HEX);
-      resp_buf = speed&0xff;
-      Serial.print(resp_buf,HEX);
-      Serial.print("AI");
-    }
+      else {
+        tx_buf[buf_head++] = 0;
+        tx_buf[buf_head++] = 0;
+      }
       break;
+
     case 0x04:
-      Serial.println(" read position: ");
-      Serial.println(M[ID].get_position());
+      // Serial.println(" read position: ");
+      // Serial.println(M[ID].get_position());
+      tx_buf[buf_head++] = 0x04;
+      pos = M[ID].get_position();
+      tx_buf[buf_head++] = (pos&0xff00)>>8;
+      tx_buf[buf_head++] = pos&0xff;
       break;
     case 0x05:
-      Serial.println(" stop");
+      // Serial.println(" stop");
       M[ID].set_ctrl_mode(0,target_pos);
       break;
     case 0x06:
-      Serial.println(" position reset");
+      // Serial.println("position reset");
       M[ID].reset_position();
       break;
     case 0x07:
-      Serial.println(" read angle");
-      Serial.println(AS[ID].get_angle());
+      ang = (short) AS[ID].get_angle()*100;
+      // Serial.println(" read angle");
+      // Serial.println(ang);
+      tx_buf[buf_head++] = 0x07;
+      tx_buf[buf_head++] = (ang&0xff00)>>8;
+      tx_buf[buf_head++] = ang&0xff;
       break;
     default:
       Serial.println(" error cmd type");
       Serial.println(type);
       break;
   }
+
+  tx_buf[buf_head++] = 0x41;                              //帧尾“AI”
+  tx_buf[buf_head++] = 0x49;
+  for(int i=0; i<buf_head; i++) {
+    Serial.write(tx_buf[i]);
+  }
+
   return;
 }
 
