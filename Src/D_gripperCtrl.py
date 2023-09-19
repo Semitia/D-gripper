@@ -6,37 +6,70 @@ from ServoCtrl import ServoCtrl
 from nanoCtrl import NanoCtrl
 import keyboard
 import time
-
+import random
 
 class DgripperCtrl:
-    def __init__(self, servo_port, servo_baud, nano_port, nano_baud):
-        self.Servo = ServoCtrl(servo_port, servo_baud)
-        self.nano = NanoCtrl(nano_port, nano_baud)
-        print("Init DgripperCtrl Complete!")
+    SERVO_NUM = 3
 
-    def __init__(self):
-        print("Init DgripperCtrl Complete!")
+    def __init__(self, servo_port, servo_baud, nano_port, nano_baud):
+        self.nano = NanoCtrl(nano_port, nano_baud)
+        self.Servo = ServoCtrl(servo_port, servo_baud, self.SERVO_NUM)
+        print("DgripperCtrl Init Complete!")
 
     def run(self):
         while True:
-            if keyboard.is_pressed('q'):
-                # 夹爪1张开
-                self.Servo.move(1, 1000, 1000)
-            elif keyboard.is_pressed('w'):
-                # 夹爪2张开
-                self.Servo.move(2, 1000, 1000)
-            elif keyboard.is_pressed('e'):
-                # 夹爪3张开
-                self.Servo.move(3, 1000, 1000)
-            elif keyboard.is_pressed('u'):
+            if keyboard.is_pressed('q'):                  # 夹爪0张开
+                self.Servo.step_forward(0)
+                print("q")
 
+            elif keyboard.is_pressed('w'):                # 夹爪1张开
+                self.Servo.step_forward(1)
+                print("w")
 
+            elif keyboard.is_pressed('e'):                # 夹爪2张开
+                self.Servo.step_forward(2)
+                print("e")
 
-            self.Servo.update()
+            elif keyboard.is_pressed('a'):                # 夹爪0闭合
+                print("a")
+                self.Servo.step_backward(0)
+
+            elif keyboard.is_pressed('s'):                # 夹爪1闭合
+                print("s")
+                self.Servo.step_backward(1)
+
+            elif keyboard.is_pressed('d'):                # 夹爪2闭合
+                print("d")
+                self.Servo.step_backward(2)
+
+            elif keyboard.is_pressed('1'):                # 读取角度传感器0,1,2角度
+                sensor_id = int(input("Please input sensor id: "))
+                self.nano.angle[sensor_id].read_data(self.nano.ser)
+
+            elif keyboard.is_pressed('4'):                # 读取步进电机0,1,2速度
+                motor_id = int(input("Please input motor id: "))
+                self.nano.motor[motor_id].read_speed(self.nano.ser)
+
+            elif keyboard.is_pressed('5'):                # 设置步进电机0,1,2速度
+                motor_id = int(input("Please input motor id: "))
+                target_speed = float(input("Please input target speed: "))
+                self.nano.motor[motor_id].set_speed(target_speed, self.nano.ser)
+
+            elif keyboard.is_pressed("7"):                # 读取步进电机0,1,2位置
+                motor_id = int(input("Please input motor id: "))
+                self.nano.motor[motor_id].read_position(self.nano.ser)
+
+            elif keyboard.is_pressed('2'):                # 设置步进电机0,1,2位置
+                motor_id = int(input("Please input motor id: "))
+                target_position = int(input("Please input target position: "))
+                self.nano.motor[motor_id].set_position(target_position, self.nano.ser)
+
+            # elif keyboard.is_pressed('u'):
+            # self.Servo.update( )
             time.sleep(0.1)
 
 
-no1 = DgripperCtrl()
+no1 = DgripperCtrl("COM9", 115200, "COM8", 115200)
 no1.run()
 
 

@@ -11,6 +11,7 @@ from Stepper import StepperCtrl
 from AngleSensor import AngleSensor
 import serial
 import threading
+import numpy as np
 
 
 def add_tail(cmd):
@@ -31,13 +32,13 @@ class NanoCtrl:
         # self.rxbuf_len = 0
         self.ReadPortThread = threading.Thread(target=self.read_port)
         self.ReadPortThread.start()
-        print("Init StepperCtrl Complete!")
+        print("Init Nano board Complete with port:", port, "baud:", baud)
 
     def read_port(self):
         while True:
             if self.ser.in_waiting > 0:
                 msg = self.ser.read(self.ser.in_waiting)
-                print(msg)
+                # print(msg)
                 for byte in msg:
                     self.process_byte(byte)
 
@@ -50,7 +51,7 @@ class NanoCtrl:
         elif self.end_flag == 1:
             if byte == 0x49:
                 self.end_flag = 0
-                print("received ", self.rxbuf)
+                # print("received ", self.rxbuf)
                 self.process_frame()
             else:
                 self.end_flag = 0
@@ -62,11 +63,28 @@ class NanoCtrl:
         id_num = self.rxbuf[0]
         if self.rxbuf[1] == 0x03:
             # 读取速度
-            speed = self.rxbuf[3] << 8 | self.rxbuf[4]
-            if self.rxbuf[2]:
-                speed = -speed
+            interval = np.int16(self.rxbuf[2] << 8 | self.rxbuf[3])  # 步进时间间隔ms
+            if interval == 0:
+                speed = 0
+            else:
+                speed = self.motor[id_num].STEP_DISTANCE * 1000 / interval
             self.motor[id_num].speed_update(speed)
-            print("motor", id_num, "speed", speed)
+            print("motor", id_num, "'s speed", speed)
+        elif self.rxbuf[1] == 0x04:
+            # 读取位置
+            pos = np.uint16(self.rxbuf[2] << 8 | self.rxbuf[3])
+            self.motor[id_num].pos_update(pos)
+            print("motor", id_num, "'s pos", pos)
+
+
+        elif self.rxbuf[1] == 0x07:
+            # 读取角度
+            angle = np.int16(self.rxbuf[2] << 8 | self.rxbuf[3])  # 角度(°) * 100
+            angle /= 100
+            self.angle[id_num].update(angle)
+            print("angleSs", id_num, "'s angle", angle)
+        self.rxbuf.clear()
+
 
 
 # controller = NanoCtrl('COM7', 115200)

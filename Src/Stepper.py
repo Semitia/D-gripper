@@ -23,14 +23,17 @@ class StepperCtrl:
     def __init__(self, num):
         self.num = num                                              # 电机编号
         self.speed = 0                                              # 电机速度
+        self.position = 0                                           # 电机位置
         self.speed_updated = False                                  # 电机速度是否更新
+        self.pos_updated = False                                    # 电机位置是否更新
         # self.ser = serial.Serial(port, baud)
-        print("Init StepperCtrl Complete!")
+        print("StepperCtrl ", num, " Init Complete!")
 
-    def set_speed(self, speed):
+    def set_speed(self, speed, ser):
         # 生成0x01类型的指令
+        direction = 0x00
         if speed == 0:
-            freq = 0xffff
+            interval = 0xffff
         else:
             if speed > 0:
                 direction = 0x00
@@ -38,26 +41,26 @@ class StepperCtrl:
             else:
                 direction = 0x01
                 speed = -speed
-            freq = int(speed / self.STEP_DISTANCE)            # 将speed转换为频率
+            interval = int(1000 * self.STEP_DISTANCE/speed)              # 将speed转换为步进时间间隔
 
-        cmd = bytearray([self.num, 0x01, direction, freq >> 8, freq & 0xFF])
+        cmd = bytearray([self.num, 0x01, direction, interval >> 8, interval & 0xFF])
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
-        # self.ser.write(cmd)
+        ser.write(cmd)
         return cmd
 
-    def set_position(self, target_position):
+    def set_position(self, target_position, ser):
         # 生成0x02类型的指令
         cmd = bytearray([self.num, 0x02, target_position >> 8, target_position & 0xFF])
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
-        # self.ser.write(cmd)
+        ser.write(cmd)
         return cmd
 
     def read_speed(self, ser):
-        # 生成0x03类型的指令
+        # ID，0x03
         cmd = bytearray([self.num, 0x03])
         # 添加帧尾
         cmd = add_tail(cmd)
@@ -71,21 +74,43 @@ class StepperCtrl:
                 print("read speed timeout")
                 return
         self.speed_updated = False
-        print("no.", self.num, "speed:", self.speed)
+        print("read successfully")
         return self.speed
 
     def speed_update(self, speed):
+        """
+        更新电机速度,同时将speed_updated置为True
+        :param speed:
+        :return:
+        """
         self.speed = speed
         self.speed_updated = True
 
-    def read_position(self):
+    def read_position(self, ser):
         # 生成0x04类型的指令
         cmd = bytearray([self.num, 0x04])
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
-        # self.ser.write(cmd)
-        return cmd
+        ser.write(cmd)
+        count = 50
+        while not self.pos_updated:
+            count -= 1
+            time.sleep(0.001)
+            if count <= 0:
+                print("read position timeout")
+                return
+        self.pos_updated = False
+        print("read position successfully")
+
+    def pos_update(self, position):
+        """
+        更新电机位置,同时将pos_updated置为True
+        :param position:
+        :return:
+        """
+        self.position = position
+        self.pos_updated = True
 
     def stop(self):
         # 生成0x05类型的指令

@@ -12,6 +12,17 @@ import serial
 import threading
 
 
+def range_limit(num, my_min, my_max):
+    """
+    限幅函数
+    """
+    if num > my_max:
+        num = my_max
+    elif num < my_min:
+        num = my_min
+    return num
+
+
 def checksum(buf):
     # 左闭右开
     temp = sum(buf[2:buf[3] + 2])
@@ -24,7 +35,11 @@ class Servo:
         self.pos = 0
         self.vin = 0
 
+
 class ServoCtrl:
+    SERVO_RANGE_MX = 1000
+    SERVO_RANGE_MN = 0
+    # 串口消息类型
     SERVO_FRAME_HEADER = 0x55
     SERVO_MOVE_TIME_WRITE = 1
     SERVO_MOVE_TIME_READ = 2
@@ -55,19 +70,41 @@ class ServoCtrl:
     SERVO_LED_ERROR_WRITE = 35
     SERVO_LED_ERROR_READ = 36
 
-    def __init__(self, port, baud):
+    def __init__(self, port, baud, servo_num):
         self.ser = serial.Serial(port, baud)
+        self.servo_num = servo_num
+        self.servo_list = [Servo() for _ in range(servo_num)]
         self.got_frame_header = False
         self.frame_header_count = 0
         self.data_count = 0
         self.data_length = 2
+        self.com_mutex = threading.Lock()
         self.rx_completed = False
         self.rx_buf = bytearray(15)  # 0,1:header; 2:id; 3:length; 4:cmd; 5~:data; -1:checksum
         self.ReadPortThread = threading.Thread(target=self.read_port)
+        self.update_pos_thread = threading.Thread(target=self.update_pos_thread)
+        # self.update_pos_thread.start()
         self.ReadPortThread.start()
-        print("Init ServoCtrl Complete!")
+
+        for j in range(3):
+            for i in range(self.servo_num):
+                self.read_position(i)
+                time.sleep(0.2)
+
+        print("ServoCtrl init successfully with COM port: ", port, " baud: ", baud)
+
+    def update_pos_thread(self):
+        while True:
+            for i in range(self.servo_num):
+                self.com_mutex.acquire()                    # 获取互斥锁
+                self.read_position(i)
+                time.sleep(0.1)
+                self.com_mutex.release()                    # 释放互斥锁
 
     def read_port(self):
+        """
+        monitor the serial port and process the received data in a thread
+        """
         while True:
             if self.ser.in_waiting > 0:
                 msg = self.ser.read(self.ser.in_waiting)
@@ -76,6 +113,11 @@ class ServoCtrl:
                     self.process_byte(byte)
 
     def process_byte(self, byte):
+        """
+        process the received data, save it to rx_buf
+        :param byte:
+        :return:
+        """
         if not self.got_frame_header:
             if byte == 0x55:
                 self.frame_header_count += 1
@@ -105,7 +147,7 @@ class ServoCtrl:
 
     def set_id(self, old_id, new_id):
         """
-        设置Id
+        设置舵机Id
         """
         buf = bytearray(7)
         buf[0] = buf[1] = self.SERVO_FRAME_HEADER
@@ -116,7 +158,7 @@ class ServoCtrl:
         buf[6] = checksum(buf)
         self.ser.write(buf)
 
-    def move(self, servo_id, position, time):
+    def move(self, servo_id, position, time_use):
         """
         用一定时间移动到指定位置
         """
@@ -131,8 +173,8 @@ class ServoCtrl:
         buf[4] = self.SERVO_MOVE_TIME_WRITE
         buf[5] = position & 0xff
         buf[6] = (position >> 8) & 0xff
-        buf[7] = time & 0xff
-        buf[8] = (time >> 8) & 0xff
+        buf[7] = time_use & 0xff
+        buf[8] = (time_use >> 8) & 0xff
         buf[9] = checksum(buf)
         self.ser.write(buf)
 
@@ -163,6 +205,9 @@ class ServoCtrl:
         self.ser.write(buf)
 
     def read_response(self):
+        """
+        读取舵机返回的数据
+        """
         count = 50
         while not self.rx_completed:
             count -= 1
@@ -184,6 +229,11 @@ class ServoCtrl:
         return 0
 
     def read_position(self, servo_id):
+        """
+        读取舵机位置
+        :param servo_id:
+        :return:
+        """
         buf = bytearray(6)
         buf[0] = buf[1] = self.SERVO_FRAME_HEADER
         buf[2] = servo_id
@@ -193,11 +243,42 @@ class ServoCtrl:
         self.ser.write(buf)
         # print("read_position cmd has been send")
         ret = self.read_response()
-        print("read_position result: ", ret)
+        print("read", servo_id, "position result: ", ret)
+        self.servo_list[servo_id].pos = ret
         return ret
 
-    # def update(self):
+    def update(self):
+        """
+        更新各个舵机状态, 舵机编号0，1，2
+        """
+        for i in range(self.servo_num):
+            self.servo_list[i].pos = self.read_position(i)
 
+    def step_forward(self, servo_id):
+        """
+        舵机向前转
+        :param servo_id:
+        :return:
+        """
+        self.com_mutex.acquire()                                # 获取互斥锁
+        tem_pos = self.servo_list[servo_id].pos
+        time.sleep(0.2)
+        tem_pos = range_limit(tem_pos - 30, self.SERVO_RANGE_MN, self.SERVO_RANGE_MX)
+        print(tem_pos)
+        self.move(servo_id, tem_pos, 100)
+        self.com_mutex.release()                                # 释放互斥锁
+
+    def step_backward(self, servo_id):
+        """
+        舵机向后转
+        :param servo_id:
+        :return:
+        """
+        tem_pos = self.read_position(servo_id)
+        time.sleep(0.1)
+        tem_pos = range_limit(tem_pos + 30, self.SERVO_RANGE_MN, self.SERVO_RANGE_MX)
+        print(tem_pos)
+        self.move(servo_id, tem_pos, 100)
 
 # controller = ServoCtrl('COM7', 115200)
 # controller.read_position(1)
