@@ -6,7 +6,7 @@ from ServoCtrl import ServoCtrl
 from nanoCtrl import NanoCtrl
 import keyboard
 import time
-import random
+
 
 class DgripperCtrl:
     SERVO_NUM = 3
@@ -42,6 +42,30 @@ class DgripperCtrl:
                 print("d")
                 self.Servo.step_backward(2)
 
+            elif keyboard.is_pressed('u'):               # 步进电机0正转
+                print("u")
+                self.nano.motor[0].set_speed(0.1, self.nano.ser)
+
+            elif keyboard.is_pressed('i'):               # 步进电机1正转
+                print("i")
+                self.nano.motor[1].set_speed(0.1, self.nano.ser)
+
+            elif keyboard.is_pressed('o'):               # 步进电机2正转
+                print("o")
+                self.nano.motor[2].set_speed(0.1, self.nano.ser)
+
+            elif keyboard.is_pressed('j'):               # 步进电机0反转
+                print("j")
+                self.nano.motor[0].set_speed(-0.1, self.nano.ser)
+
+            elif keyboard.is_pressed('k'):               # 步进电机1反转
+                print("k")
+                self.nano.motor[1].set_speed(-0.1, self.nano.ser)
+
+            elif keyboard.is_pressed('l'):               # 步进电机2反转
+                print("l")
+                self.nano.motor[2].set_speed(-0.1, self.nano.ser)
+
             elif keyboard.is_pressed('1'):                # 读取角度传感器0,1,2角度
                 sensor_id = int(input("Please input sensor id: "))
                 self.nano.angle[sensor_id].read_data(self.nano.ser)
@@ -64,15 +88,19 @@ class DgripperCtrl:
                 target_position = int(input("Please input target position: "))
                 self.nano.motor[motor_id].set_position(target_position, self.nano.ser)
 
-            # elif keyboard.is_pressed('u'):
-            # self.Servo.update( )
-            time.sleep(0.1)
+            elif keyboard.is_pressed('v'):                # 手动输入舵机位置
+                servo_id = int(input("Please input servo id: "))
+                target_position = int(input("Please input target position: "))
+                self.Servo.move(servo_id, target_position, 0)
+
+            elif keyboard.is_pressed(' '):
+                print("stop")
+                for i in range(3):
+                    self.nano.motor[i].stop(self.nano.ser)
+
+            self.Servo.update()
+            time.sleep(0.2)
 
 
-no1 = DgripperCtrl("COM9", 115200, "COM8", 115200)
+no1 = DgripperCtrl("COM5", 115200, "COM7", 115200)
 no1.run()
-
-
-
-
-

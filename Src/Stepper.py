@@ -112,13 +112,13 @@ class StepperCtrl:
         self.position = position
         self.pos_updated = True
 
-    def stop(self):
+    def stop(self, ser):
         # 生成0x05类型的指令
         cmd = bytearray([self.num, 0x05])
         # 添加帧尾
         cmd = add_tail(cmd)
         # 发送指令
-        # self.ser.write(cmd)
+        ser.write(cmd)
         return cmd
 
     def position_reset(self):

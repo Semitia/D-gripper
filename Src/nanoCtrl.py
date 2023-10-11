@@ -76,7 +76,6 @@ class NanoCtrl:
             self.motor[id_num].pos_update(pos)
             print("motor", id_num, "'s pos", pos)
 
-
         elif self.rxbuf[1] == 0x07:
             # 读取角度
             angle = np.int16(self.rxbuf[2] << 8 | self.rxbuf[3])  # 角度(°) * 100

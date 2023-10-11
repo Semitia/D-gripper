@@ -85,11 +85,11 @@ class ServoCtrl:
         self.update_pos_thread = threading.Thread(target=self.update_pos_thread)
         # self.update_pos_thread.start()
         self.ReadPortThread.start()
-
-        for j in range(3):
-            for i in range(self.servo_num):
-                self.read_position(i)
-                time.sleep(0.2)
+        self.update()
+        # for j in range(3):
+        #     for i in range(self.servo_num):
+        #         self.read_position(i)
+        #         time.sleep(0.2)
 
         print("ServoCtrl init successfully with COM port: ", port, " baud: ", baud)
 
@@ -118,6 +118,8 @@ class ServoCtrl:
         :param byte:
         :return:
         """
+        # print("data_count", self.data_count, "process_byte: ", byte)
+
         if not self.got_frame_header:
             if byte == 0x55:
                 self.frame_header_count += 1
@@ -217,6 +219,7 @@ class ServoCtrl:
                 print("waiting time out")
                 return -2048
         # self.ser.in_waiting,属性表示串口接收缓冲区中的字节数
+        self.rx_completed = False # 这个很重要，之前一直有问题
         buf = self.rx_buf
         if checksum(buf) != buf[buf[3] + 2]:
             print("checksum error")
@@ -263,9 +266,10 @@ class ServoCtrl:
         self.com_mutex.acquire()                                # 获取互斥锁
         tem_pos = self.servo_list[servo_id].pos
         time.sleep(0.2)
-        tem_pos = range_limit(tem_pos - 30, self.SERVO_RANGE_MN, self.SERVO_RANGE_MX)
         print(tem_pos)
-        self.move(servo_id, tem_pos, 100)
+        tem_pos = range_limit(tem_pos - 50, self.SERVO_RANGE_MN, self.SERVO_RANGE_MX)
+        print(tem_pos)
+        self.move(servo_id, tem_pos, 0)
         self.com_mutex.release()                                # 释放互斥锁
 
     def step_backward(self, servo_id):
@@ -276,9 +280,9 @@ class ServoCtrl:
         """
         tem_pos = self.read_position(servo_id)
         time.sleep(0.1)
-        tem_pos = range_limit(tem_pos + 30, self.SERVO_RANGE_MN, self.SERVO_RANGE_MX)
+        tem_pos = range_limit(tem_pos + 50, self.SERVO_RANGE_MN, self.SERVO_RANGE_MX)
         print(tem_pos)
-        self.move(servo_id, tem_pos, 100)
+        self.move(servo_id, tem_pos, 0)
 
 # controller = ServoCtrl('COM7', 115200)
 # controller.read_position(1)
